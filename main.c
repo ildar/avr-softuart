@@ -42,6 +42,13 @@ Data:         52 bytes (10.2% Full)
 
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
+#include <util/delay.h>
+
+#define LEDOUT PORTB5
+#define LEDPORT PORTB
+#define LEDDDR DDRB
+#define LEDDDRPIN DDB5
+
 #include "softuart.h"
 
 
@@ -69,6 +76,13 @@ static void stdio_demo_func( void )
 }
 #endif /* WITH_STDIO_DEMO */
 
+void delay_ms(unsigned int xms)
+{
+        while(xms){
+                _delay_ms(0.96);
+                xms--;
+        }
+}
 
 int main(void)
 {
@@ -82,36 +96,42 @@ int main(void)
 #define CNTHALLO (unsigned int)(0xFFFF/3)
 #endif
 
+	/* enable pin as output */
+	LEDDDR|= (1<<LEDDDRPIN);
+
 	softuart_init();
 	softuart_turn_rx_on(); /* redundant - on by default */
 	
 	sei();
 
+	LEDPORT|= (1<<LEDOUT); // led on, pin=1
 	softuart_puts_P( "\r\nSoftuart Demo-Application\r\n" );    // "implicit" PSTR
 	softuart_puts_p( PSTR("generic softuart driver code by Colin Gittins\r\n") ); // explicit PSTR
 	softuart_puts_p( pstring ); // pstring defined with PROGMEM
 	softuart_puts( "--\r\n" );  // string "from RAM"
+	LEDPORT &= ~(1<<LEDOUT); // led off, pin=0
 
 #if WITH_STDIO_DEMO
 	stdio_demo_func();
 #endif
 	
-	for (;;) {
+	while ( !softuart_kbhit() ) {
+		LEDPORT|= (1<<LEDOUT); // led on, pin=1
+		softuart_putchar( '.' );
+		LEDPORT &= ~(1<<LEDOUT); // led off, pin=0
+		delay_ms(500);
+	}
 	
+	for (;;)
 		if ( softuart_kbhit() ) {
 			c = softuart_getchar();
+			LEDPORT|= (1<<LEDOUT); // led on, pin=1
 			softuart_putchar( '[' );
 			softuart_putchar( c );
 			softuart_putchar( ']' );
-		}
-
-		cnt++;
-		if (cnt == CNTHALLO) {
-			cnt = 0;
-			softuart_puts_P( " Hello " );
-		}
-		
-	}
+			LEDPORT &= ~(1<<LEDOUT); // led off, pin=0
+		} else
+			delay_ms(100);
 	
 	return 0; /* never reached */
 }
